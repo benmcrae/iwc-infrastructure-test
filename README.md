@@ -60,3 +60,16 @@ Below are the tests I have written through my findings when navigating the serve
 * **[FIX-003]** Apache directory permissions should be more restrictive (755)
 * **[FIX-004]** Child httpd processes should be executed as non 'root' user
 * **[FIX-005]** Apache has incorrect runlevels for startup
+
+### Run ServerSpec tests
+
+If you want to run the ServerSpec tests locally, there are some environment prerequisites.
+
+* Local Ruby installation (I currently run Ruby 2.3.0)
+* Installation of bundler gem (`gem install bundler`)
+* Run `bundle install` - if the gem dependencies fail, delete the `Gemfile.lock` and run install again
+
+Before executing tests, make sure you have the server private key added to your authentication agent `ssh-add path_to_private_key.pem`. Then off you go...
+
+1. `cd ec2-tests`
+2. `rake spec`
