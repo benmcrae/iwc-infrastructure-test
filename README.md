@@ -4,13 +4,12 @@ Steps of workflow / implementation.
 
 1. Exploratory testing of server and Apache installation / configuration.
 2. Write ServerSpec tests for conformity and convergence.
+3. Identify implementation strategies.
+4. Technical implementation.
 
 ## 1. Exploratory testing
 
-Ubuntu Precise 12.04 machine with Apache 2.2.4 installed from source.
-
-*This is an old version of Apache. Correct steps would be to upgrade to latest stable (for security purposes if anything), however, this looks out of scope for the user story.*
-
+Ubuntu Precise 12.04 LTS machine with Apache 2.2.4 installed from source.
 
 ```
 root@ip-172-31-45-119:/opt/apache/bin# ./apachectl -V
@@ -43,7 +42,29 @@ Server compiled with....
  -D AP_TYPES_CONFIG_FILE="conf/mime.types"
  -D SERVER_CONFIG_FILE="conf/httpd.conf"
 ```
-Was curious about 'BIG_SECURITY_HOLE'. A quick google search came back with 'Apache has not been designed to serve pages while running as root', suggesting that BIG_SECURITY_HOLE is not necessary if we change the Apache User to a non 'root' user.
+
+A few observations from this...
+
+* This is an old version of Apache from 2007.
+
+* Was curious about 'BIG_SECURITY_HOLE'. A quick Google search came back with 'Apache has not been designed to serve pages while running as root', suggesting that BIG_SECURITY_HOLE is not necessary if we change the Apache config user to a non 'root' user.
+
+* The server installation has been compiled the with following *static* extensions - I found the modules by looking through the `./configure --help` documentation (on an ubuntu/precise64 Vagrant box). Adding the modules statically via compilation allows faster execution time than enabling the modules through DSO. Static compilation also installs the whole module set which may not be needed (best practices are to install only the required modules used).
+```
+./configure --prefix /opt/apache /
+--enable-so /
+--enable-rewrite /
+--enable-proxy /
+--enable-vhost-alias /
+--enable-cache /
+--enable-dav /
+--enable-disk-cache /
+--enable-headers /
+--enable-expires /
+--enable-dav-lock
+```
+
+* The server has been setup to use the 'prefork' MPM (incurs threading to be turned off). Since the website is served through the proxy module, we could use either the 'worker' or 'event' (apache 2.4+) MPM which gives better concurrency via child processes and threading.
 
 ## 2. ServerSpec tests
 
@@ -53,7 +74,7 @@ Define some conformity tests to ensure we don't deviate from expected behaviour 
 * **[CON-002]** httpd process should be running
 * **[CON-003]** The parent httpd process should be owned by root
 
-Below are the tests I have written through my findings when navigating the server.
+Below are the tests I have written through my findings when navigating the server. The idea is to turn these tests green!
 
 * **[FIX-001]** Create 'apache' user
 * **[FIX-002]** Create 'apache' group
@@ -65,11 +86,34 @@ Below are the tests I have written through my findings when navigating the serve
 
 If you want to run the ServerSpec tests locally, there are some environment prerequisites.
 
-* Local Ruby installation (I currently run Ruby 2.3.0)
-* Installation of bundler gem (`gem install bundler`)
-* Run `bundle install` - if the gem dependencies fail, delete the `Gemfile.lock` and run install again
+1. Local Ruby installation (I currently run Ruby 2.3.0).
+2. Installation of bundler gem (`gem install bundler`).
+3. Run `bundle install` in project directory - if the gem dependencies fail, delete the `Gemfile.lock` and run install again.
 
 Before executing tests, make sure you have the server private key added to your authentication agent `ssh-add path_to_private_key.pem`. Then off you go...
 
 1. `cd ec2-tests`
 2. `rake spec`
+
+## 3. Implementation strategies
+
+I have identified 2 potential implementations for managing Apache. I will discuss the pros and cons for each approach.
+
+1. **Keep existing Apache installation** - which has been installed from source. Run a configuration management tool to implement any desired fixes discovered from exploratory testing.
+  * **PRO:** Can install modules statically, this has marginally better performance.
+  * **CON:** It can be dangerous to converge an application which has been installed outside of a configuration management tool and subject to entropy.
+  * **CON:** When installing from source, to achieve idempotency will require more work.
+  * **CON:** Unable to make full use of existing configuration management tools which will lead to more complexity in setup scripts.
+
+2. **Install Apache through a package manager** - remove old source installation. This will install the latest (pinned) Apache from the 'apt' package manager.
+  * **PRO:** The apache binaries will have more thorough testing for the particular OS installation (Ubuntu 12.04 LTS).
+  * **PRO:** Security patches will be easier to obtain and apply.
+  * **PRO:** Additional tools provided such as a2enmod to manage DSO modules.
+  * **PRO:** Fresh install of Apache - no entropy.
+  * **CON:** More difficult to statically add modules, if necessary.
+  * **CON:** Will need to diff existing configuration scripts to make sure we don't lose any configuration settings.
+  * **CON:** Will require additional scripts to stop and remove existing apache installation.
+
+## 4. Technical Implementation
+
+I have decided to go with second implementation - **Install Apache through a package manager**.
