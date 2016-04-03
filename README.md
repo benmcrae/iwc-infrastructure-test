@@ -3,8 +3,8 @@
 Steps of workflow / implementation.
 
 1. Exploratory testing of server and Apache installation / configuration.
-2. Write ServerSpec tests for conformity and convergence.
-3. Identify implementation strategies.
+2. Identify implementation strategies.
+3. Write ServerSpec tests for conformity and convergence.
 4. Technical implementation.
 
 ## 1. Exploratory testing
@@ -49,7 +49,7 @@ A few observations from this...
 
 * Was curious about 'BIG_SECURITY_HOLE'. A quick Google search came back with 'Apache has not been designed to serve pages while running as root', suggesting that BIG_SECURITY_HOLE is not necessary if we change the Apache config user to a non 'root' user.
 
-* The server installation has been compiled the with following *static* extensions - I found the modules by looking through the `./configure --help` documentation (on an ubuntu/precise64 Vagrant box). Adding the modules statically via compilation allows faster execution time than enabling the modules through DSO. Static compilation also installs the whole module set which may not be needed (best practices are to install only the required modules used).
+* The server installation has been compiled the with following *static* extensions - I found the modules by looking at `./apachectl -M` and comparing with the `./configure --help` documentation (on an ubuntu/precise64 Vagrant box). Adding the modules statically via compilation allows faster execution time than enabling the modules through DSO. Static compilation also installs the whole module set which may not be needed (best practices are to install only the required modules used).
 ```
 ./configure --prefix /opt/apache /
 --enable-so /
@@ -66,36 +66,7 @@ A few observations from this...
 
 * The server has been setup to use the 'prefork' MPM (incurs threading to be turned off). Since the website is served through the proxy module, we could use either the 'worker' or 'event' (apache 2.4+) MPM which gives better concurrency via child processes and threading.
 
-## 2. ServerSpec tests
-
-Define some conformity tests to ensure we don't deviate from expected behaviour during upgrades or idempotency tests. These tests should **ALWAYS** pass / run green.
-
-* **[CON-001]** Port 80 should always be listening
-* **[CON-002]** httpd process should be running
-* **[CON-003]** The parent httpd process should be owned by root
-
-Below are the tests I have written through my findings when navigating the server. The idea is to turn these tests green!
-
-* **[FIX-001]** Create 'apache' user
-* **[FIX-002]** Create 'apache' group
-* **[FIX-003]** Apache directory permissions should be more restrictive (755)
-* **[FIX-004]** Child httpd processes should be executed as non 'root' user
-* **[FIX-005]** Apache has incorrect runlevels for startup
-
-### Run ServerSpec tests
-
-If you want to run the ServerSpec tests locally, there are some environment prerequisites.
-
-1. Local Ruby installation (I currently run Ruby 2.3.0).
-2. Installation of bundler gem (`gem install bundler`).
-3. Run `bundle install` in project directory - if the gem dependencies fail, delete the `Gemfile.lock` and run install again.
-
-Before executing tests, make sure you have the server private key added to your authentication agent `ssh-add path_to_private_key.pem`. Then off you go...
-
-1. `cd ec2-tests`
-2. `rake spec`
-
-## 3. Implementation strategies
+##2. Implementation strategies
 
 I have identified 2 potential implementations for managing Apache. I will discuss the pros and cons for each approach.
 
@@ -114,6 +85,42 @@ I have identified 2 potential implementations for managing Apache. I will discus
   * **CON:** Will need to diff existing configuration scripts to make sure we don't lose any configuration settings.
   * **CON:** Will require additional scripts to stop and remove existing apache installation.
 
-## 4. Technical Implementation
+### Decision
 
-I have decided to go with second implementation - **Install Apache through a package manager**.
+I have decided to go with second implementation - **Install Apache through a package manager**. The main reasons are due to fresh install of apache - no entropy, better tools to support idempotency, easier to build and roll out new machines.
+
+## 3. ServerSpec tests
+
+  Define some conformity tests to ensure we don't deviate from expected behaviour during upgrades or idempotency tests. These tests should **ALWAYS** pass / run green.
+
+  * **[CON-001]** Port 80 should always be listening
+  * **[CON-002]** Apache configuration syntax test
+  * **[CON-003]** Check default server and namevhost are set to 'www.leodis.ac.uk'
+
+  Below are the tests I have written based on the selection of the second implementation - **Install Apache through a package manager**. The idea is to turn these tests green!
+
+  * **[FIX-001]** 'www-data' user exists
+  * **[FIX-002]** 'www-data' group exists
+  * **[FIX-003]** 'apache2' process should be running
+  * **[FIX-004]** Parent 'apache2' process should be owned by root
+  * **[FIX-005]** Child 'apache2' processes should be owned as 'www-data'
+  * **[FIX-006]** Apache should be enabled for startup
+  * **[FIX-007]** Apache server should use MPM 'worker'
+  * **[FIX-008]** Apache 2.2.22 should be installed via apt package manager
+
+  ### Run ServerSpec tests
+
+  If you want to run the ServerSpec tests locally, there are some environment prerequisites.
+
+  1. Local Ruby installation (I currently run Ruby 2.3.0).
+  2. Installation of bundler gem (`gem install bundler`).
+  3. Run `bundle install` in project directory - if the gem dependencies fail, delete the `Gemfile.lock` and run install again.
+
+  Before executing tests, make sure you have the server private key added to your authentication agent `ssh-add path_to_private_key.pem`. Then off you go...
+
+  1. `cd ec2-tests`
+  2. `rake spec`
+
+![ServerSpec first test run](testruns/first.png)
+
+## 4. Technical Implementation
