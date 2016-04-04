@@ -1,0 +1,6 @@
+---
+- name: install apache, enable modules, and create vhosts
+  hosts: webservers
+  become: true
+  roles:
+    - apache

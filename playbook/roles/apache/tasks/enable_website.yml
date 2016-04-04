@@ -1,0 +1,10 @@
+---
+- name: create leodis virtual host file
+  template: src=virtualhost-proxy.conf dest=/etc/apache2/sites-available/{{ domain }}.conf
+
+- name: a2ensite {{ domain }}
+  command: a2ensite {{ domain }}.conf
+  args:
+    creates: /etc/apache2/sites-enabled/{{ domain }}.conf
+  notify:
+    - restart apache2

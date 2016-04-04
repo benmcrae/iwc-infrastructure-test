@@ -1,0 +1,15 @@
+---
+- name: install apache2
+  apt: name=apache2=2.2.22-1ubuntu1.10 update_cache=yes state=present
+
+- name: Set Apache FQDN
+  copy: content="ServerName localhost" dest=/etc/apache2/conf.d/fqdn
+  notify:
+    - restart apache2
+
+- name: a2dissite 000-default
+  command: a2dissite 000-default
+  args:
+    removes: /etc/apache2/sites-enabled/000-default
+  notify:
+      - restart apache2

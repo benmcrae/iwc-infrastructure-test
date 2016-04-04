@@ -1,0 +1,4 @@
+http_port: 80
+domain: www.leodis.ac.uk
+domain_alias: leodis.ac.uk leodis.co.uk www.leodis.co.uk leodis.net www.leodis.net
+proxy_port: 1337

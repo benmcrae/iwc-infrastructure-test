@@ -1,0 +1,7 @@
+---
+- name: remove old apache source and run new apache role
+  hosts: old_webservers
+  become: true
+  roles:
+    - remove_http
+    - apache
