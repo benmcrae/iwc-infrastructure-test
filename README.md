@@ -66,6 +66,10 @@ A few observations from this...
 
 * The server has been setup to use the 'prefork' MPM (incurs threading to be turned off). Since the website is served through the proxy module, we could use either the 'worker' or 'event' (apache 2.4+) MPM which gives better concurrency via child processes and threading.
 
+* Permissions on the `/opt/apache` directory should be restricted from RWX for 'everyone' to a minimum `755`.
+
+* Apache logs exist in `/opt/apache/logs` - the correct standard would be in `/var/log`. No log rotation for `access.log` or `error.log`. The PID file was also in the same directory - this should be in `/var/run`.
+
 ##2. Implementation strategies
 
 I have identified 2 potential implementations for managing Apache. I will discuss the pros and cons for each approach.
@@ -91,36 +95,39 @@ I have decided to go with second implementation - **Install Apache through a pac
 
 ## 3. ServerSpec tests
 
-  Define some conformity tests to ensure we don't deviate from expected behaviour during upgrades or idempotency tests. These tests should **ALWAYS** pass / run green.
+Define some conformity tests to ensure we don't deviate from expected behaviour during upgrades or idempotency tests. These tests should **ALWAYS** pass / run green.
 
-  * **[CON-001]** Port 80 should always be listening
-  * **[CON-002]** Apache configuration syntax test
-  * **[CON-003]** Check default server and namevhost are set to 'www.leodis.ac.uk'
+* **[CON-001]** Port 80 should always be listening
+* **[CON-002]** Apache configuration syntax test
+* **[CON-003]** Check default server and namevhost are set to 'www.leodis.ac.uk'
 
-  Below are the tests I have written based on the selection of the second implementation - **Install Apache through a package manager**. The idea is to turn these tests green!
+Below are the tests I have written based on the selection of the second implementation - **Install Apache through a package manager**. The idea is to turn these tests green!
 
-  * **[FIX-001]** 'www-data' user exists
-  * **[FIX-002]** 'www-data' group exists
-  * **[FIX-003]** 'apache2' process should be running
-  * **[FIX-004]** Parent 'apache2' process should be owned by root
-  * **[FIX-005]** Child 'apache2' processes should be owned as 'www-data'
-  * **[FIX-006]** Apache should be enabled for startup
-  * **[FIX-007]** Apache server should use MPM 'worker'
-  * **[FIX-008]** Apache 2.2.22 should be installed via apt package manager
+* **[FIX-001]** 'www-data' user exists
+* **[FIX-002]** 'www-data' group exists
+* **[FIX-003]** 'apache2' process should be running
+* **[FIX-004]** Parent 'apache2' process should be owned by root
+* **[FIX-005]** Child 'apache2' processes should be owned as 'www-data'
+* **[FIX-006]** Apache should be enabled for startup
+* **[FIX-007]** Apache server should use MPM 'worker'
+* **[FIX-008]** Apache 2.2.22 should be installed via apt package manager
 
-  ### Run ServerSpec tests
+### Run ServerSpec tests
 
-  If you want to run the ServerSpec tests locally, there are some environment prerequisites.
+If you want to run the ServerSpec tests locally, there are some environment prerequisites.
 
-  1. Local Ruby installation (I currently run Ruby 2.3.0).
-  2. Installation of bundler gem (`gem install bundler`).
-  3. Run `bundle install` in project directory - if the gem dependencies fail, delete the `Gemfile.lock` and run install again.
+1. Local Ruby installation (I currently run Ruby 2.3.0).
+2. Installation of bundler gem (`gem install bundler`).
+3. Run `bundle install` in project directory - if the gem dependencies fail, delete the `Gemfile.lock` and run install again.
 
-  Before executing tests, make sure you have the server private key added to your authentication agent `ssh-add path_to_private_key.pem`. Then off you go...
+Before executing tests, make sure you have the server private key added to your authentication agent `ssh-add path_to_private_key.pem`. Then off you go...
 
-  1. `cd ec2-tests`
-  2. `rake spec`
+1. `cd ec2-tests`
+2. `rake spec`
 
 ![ServerSpec first test run](testruns/first.png)
 
 ## 4. Technical Implementation
+
+Homogeneous systems - mpm workers / thread count
+ansible
