@@ -16,10 +16,10 @@ describe "[CON-002] Apache configuration syntax test" do
 end
 
 describe "[CON-003] Check default server and namevhost are set to 'www.leodis.ac.uk'" do
-  describe command("apachectl -S") do
+  describe command("apachectl -S 2>&1") do
     let(:path) { '$PATH:/opt/apache/bin' }
-    its(:stderr) { should match /default server www.leodis.ac.uk/ }
-    its(:stderr) { should match /port 80 namevhost www.leodis.ac.uk/ }
+    its(:stdout) { should match /default server www.leodis.ac.uk/ }
+    its(:stdout) { should match /port 80 namevhost www.leodis.ac.uk/ }
   end
 end
 
