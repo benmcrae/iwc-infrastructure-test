@@ -1,3 +1,4 @@
 .vagrant/
 techtest-Ben-McRae.pem
 PlatformEngineerTechnicalTest.docx
+*.retry

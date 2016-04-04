@@ -85,6 +85,7 @@ I have identified 2 potential implementations for managing Apache. I will discus
   * **PRO:** Security patches will be easier to obtain and apply.
   * **PRO:** Additional tools provided such as a2enmod to manage DSO modules.
   * **PRO:** Fresh install of Apache - no entropy.
+  * **PRO:** Will create logrotate entries for any logs in `/var/log/apache2`
   * **CON:** More difficult to statically add modules, if necessary.
   * **CON:** Will need to diff existing configuration scripts to make sure we don't lose any configuration settings.
   * **CON:** Will require additional scripts to stop and remove existing apache installation.
@@ -112,7 +113,7 @@ Below are the tests I have written based on the selection of the second implemen
 * **[FIX-007]** Apache server should use MPM 'worker'
 * **[FIX-008]** Apache 2.2.22 should be installed via apt package manager
 
-### Run ServerSpec tests
+### Run EC2 ServerSpec tests
 
 If you want to run the ServerSpec tests locally, there are some environment prerequisites.
 
@@ -125,9 +126,54 @@ Before executing tests, make sure you have the server private key added to your 
 1. `cd ec2-tests`
 2. `rake spec`
 
-![ServerSpec first test run](testruns/first.png)
+![ServerSpec first test run](assets/first.png)
 
 ## 4. Technical Implementation
 
-Homogeneous systems - mpm workers / thread count
-ansible
+I decided to do the technical implementation using Ansible *(Disclaimer: this is my first time using Ansible - feedback welcome!)*.
+
+First I created a single playbook file, then after reading the [Ansible best practices](http://docs.ansible.com/ansible/playbooks_best_practices.html), decided to refactor into multiple roles and files - changes can be seen between commits `bee13f8` and `ccde4fd`.
+
+A lot of Apache modules have been enabled, this is purely to match the configuration of the previous server. A handful of these can be turned off if desired - the main ones we need are 'vhost' and 'proxy' (this is enough to satisfy the minimum requirements of the website).
+
+### New Server
+
+I first worked on completing the playbook for new servers (no existing installation of Apache).
+
+When running `vagrant up` in the local directory, an Ubuntu 12.04 LTS machine will be created with a 2 step provision process.
+
+1. **Shell:** This creates a very simple index.html on port 1337 to mimic the leodis website.
+2. **Ansible:** This installs and configures Apache on the guest host.
+
+As part of the output from Vagrant, you will see the output from the Ansible run.
+
+```
+PLAY RECAP *********************************************************************
+new-server                 : ok=26   changed=22   unreachable=0    failed=0   
+```
+
+This successfully updated 22 tasks on the server. If we now run `vagrant provision`, a second run of the same Ansible playbook will begin. The final output now looks like...
+
+```
+PLAY RECAP *********************************************************************
+new-server                 : ok=25   changed=0    unreachable=0    failed=0
+```
+
+On the second run no tasks were changed - this demonstrates that idempotency was successful.
+
+If you open a browser and go to `http://127.0.0.1:8080`, you will see a mock website of leodis built using the playbook.
+
+#### Run Vagrant ServerSpec tests
+
+An identical `apache_spec.rb` file exists in both the 'ec2-test' and 'vagrant-tests' directories.
+
+1. `cd vagrant-tests`
+2. `rake spec`
+
+### Old Server
+
+
+
+### Homogeneous / Heterogeneous Systems
+
+The configuration for the MPM worker was not changed from the default installation. If using homogeneous systems we can hardcode the new values into the default vars file. If the systems are heterogeneous, I advise creating group_vars per server type as necessary.
