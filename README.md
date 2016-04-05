@@ -70,7 +70,7 @@ A few observations from this...
 
 * Apache logs exist in `/opt/apache/logs` - the correct standard would be in `/var/log`. No log rotation for `access.log` or `error.log`. The PID file was also in the same directory - this should be in `/var/run`.
 
-##2. Implementation strategies
+## 2. Implementation strategies
 
 I have identified 2 potential implementations for managing Apache. I will discuss the pros and cons for each approach.
 
@@ -92,7 +92,7 @@ I have identified 2 potential implementations for managing Apache. I will discus
 
 ### Decision
 
-I have decided to go with second implementation - **Install Apache through a package manager**. The main reasons are due to fresh install of apache - no entropy, better tools to support idempotency, easier to build and roll out new machines.
+I have decided to go with the second implementation - **Install Apache through a package manager**. The main reasons are due to a fresh install of Apache - no entropy, better tools to support idempotency, easier to build and roll out new machines.
 
 ## 3. ServerSpec tests
 
@@ -128,6 +128,8 @@ Before executing tests, make sure you have the server private key added to your 
 
 ![ServerSpec first test run](assets/ec2-test-pre.png)
 
+*ATTN: We have 7 passing tests and 6 failing!*
+
 ## 4. Technical Implementation
 
 I decided to do the technical implementation using Ansible *(Disclaimer: this is my first time using Ansible - feedback welcome!)*.
@@ -136,11 +138,11 @@ First I created a single playbook file, then after reading the [Ansible best pra
 
 A lot of Apache modules have been enabled, this is purely to match the configuration of the previous server. A handful of these can be turned off if desired - the main ones we need are 'vhost' and 'proxy' (this is enough to satisfy the minimum requirements of the website).
 
-### New Server
+### Building a new server
 
 I first worked on completing the playbook for new servers (no existing installation of Apache).
 
-When running `vagrant up` in the local directory, an Ubuntu 12.04 LTS machine will be created with a 2 step provision process.
+Run `vagrant up` in the local directory, an Ubuntu 12.04 LTS machine will be created with a 2 step provision process.
 
 1. **Shell:** This creates a very simple index.html on port 1337 to mimic the leodis website.
 2. **Ansible:** This installs and configures Apache on the guest host.
@@ -152,33 +154,40 @@ PLAY RECAP *********************************************************************
 new-server                 : ok=26   changed=22   unreachable=0    failed=0   
 ```
 
-This successfully updated 22 tasks on the server. If we now run `vagrant provision`, a second run of the same Ansible playbook will begin. The final output now looks like...
+This successfully updated 22 tasks on the server. If we now run `vagrant provision`, a second run of the same Ansible playbook will begin.
 
 ```
 PLAY RECAP *********************************************************************
 new-server                 : ok=25   changed=0    unreachable=0    failed=0
 ```
 
-On the second run no tasks were changed - this demonstrates that idempotency was successful.
+On the second run, no tasks were changed - this demonstrates that idempotency was successful.
 
 If you open a browser and go to `http://127.0.0.1:8080`, you will see a mock website of leodis built using the playbook.
 
 #### Run Vagrant ServerSpec tests
 
-An identical `apache_spec.rb` file exists in both the 'ec2-test' and 'vagrant-tests' directories.
+An identical `apache_spec.rb` file exists in the 'vagrant-tests' directory, copied from 'ec2-test'.
 
 1. `cd vagrant-tests`
 2. `rake spec`
 
 ![ServerSpec first test run](assets/vagrant-test.png)
 
-### Old Server
+*ATTN: All tests are passing!*
 
-I created an additional Ansible role called 'remove_http'. I didn't worry too much about idempotency as this role will only ever be ran once.
+### Rebuilding an old server
 
-I executed the role as follows `ansible-playbook -i production rebuild-webservers.yml --private-key ../techtest-Ben-McRae.pem`
+I created an additional Ansible role called 'remove_http'. I didn't worry too much about idempotency as this role will only ever be ran once, per server.
 
-The 'rebuild-webservers.yml' specification will use the 'remove_http' role to remove the old apache installation and then use the 'apache' role to reinstall it the correct way.
+```
+ansible-playbook -i production rebuild-webservers.yml --private-key ../path_to_private_key.pem
+```
+
+The 'rebuild-webservers.yml' specification is made up of two roles.
+
+1. 'remove_http' role - removes the old apache installation
+2. 'apache' role - reinstall it the correct way from a package manager
 
 ![ServerSpec first test run](assets/ec2-during.png)
 
@@ -189,8 +198,33 @@ PLAY RECAP *********************************************************************
 52.48.226.89               : ok=30   changed=26   unreachable=0    failed=0   
 ```
 
-This time Ansible updated 26 tasks instead of the previous 22 (the 4 additional tasks were used to remove the old apache install).
+This time Ansible updated 26 tasks, 4 more tasks than the previous run of 22 (the 4 additional tasks were used to remove the old apache install).
+
+#### Idempotency of our newly rebuilt server
+
+I updated the production inventory file to move the server from the '[old_webservers]' to '[webservers]' group so the 'remove_http' role could not be run again.
+
+To test idempotency on the EC2 server, I ran only the 'webserver' role again.
+
+```
+ansible-playbook -i production webservers.yml --private-key ../path_to_private_key.pem
+```
+
+![ServerSpec first test run](assets/ec2-idempotent.png)
+
+This worked successfully with no tasks updating.
+
+#### Run EC2 ServerSpec tests
+
+To verify the tests now run successfully on the EC2 instance.
+
+1. `cd ec2-tests`
+2. `rake spec`
+
+![ServerSpec first test run](assets/ec2-test-post.png)
+
+*ATTN: All tests are passing!*
 
 ### Homogeneous / Heterogeneous Systems
 
-The configuration for the MPM worker was not changed from the default installation. If using homogeneous systems we can hardcode the new values into the default vars file. If the systems are heterogeneous, I advise creating group_vars per server type as necessary.
+The configuration for the MPM worker was not changed from the default installation. If using homogeneous systems we can set the new values into the default vars file. If the systems are heterogeneous, I advise creating group_vars per server model as necessary.
