@@ -1,0 +1,2 @@
+[old_webservers]
+52.48.226.89 ansible_user=ubuntu

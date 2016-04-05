@@ -126,7 +126,7 @@ Before executing tests, make sure you have the server private key added to your 
 1. `cd ec2-tests`
 2. `rake spec`
 
-![ServerSpec first test run](assets/first.png)
+![ServerSpec first test run](assets/ec2-test-pre.png)
 
 ## 4. Technical Implementation
 
@@ -170,9 +170,26 @@ An identical `apache_spec.rb` file exists in both the 'ec2-test' and 'vagrant-te
 1. `cd vagrant-tests`
 2. `rake spec`
 
+![ServerSpec first test run](assets/vagrant-test.png)
+
 ### Old Server
 
+I created an additional Ansible role called 'remove_http'. I didn't worry too much about idempotency as this role will only ever be ran once.
 
+I executed the role as follows `ansible-playbook -i production rebuild-webservers.yml --private-key ../techtest-Ben-McRae.pem`
+
+The 'rebuild-webservers.yml' specification will use the 'remove_http' role to remove the old apache installation and then use the 'apache' role to reinstall it the correct way.
+
+![ServerSpec first test run](assets/ec2-during.png)
+
+Ansible rightly suggested I could have used the 'service' and 'file' modules.
+
+```
+PLAY RECAP *********************************************************************
+52.48.226.89               : ok=30   changed=26   unreachable=0    failed=0   
+```
+
+This time Ansible updated 26 tasks instead of the previous 22 (the 4 additional tasks were used to remove the old apache install).
 
 ### Homogeneous / Heterogeneous Systems
 

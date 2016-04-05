@@ -1,0 +1,12 @@
+---
+- name: Stop httpd process
+  command: service httpd graceful-stop
+
+- name: remove httpd runlevel entry (2)
+  command: update-rc.d -f httpd remove
+
+- name: remove startup script
+  command: rm -f /etc/init.d/httpd
+
+- name: remove apache installation
+  command: rm -rf /opt/apache
